@@ -95,7 +95,8 @@ def process_wallet_vote(
         try:
             submitted_tx.wait_to_complete(timeout=30)
             logger.success(
-                f"#{wallet_index} | {wallet.address()} | voted with [{random_vote}] | "
+                f"#{wallet_index} | {wallet.address()} | "
+                f"voted with [{random_vote}] on [{proposal_prefix}/{proposal_id}] | "
                 f"{STARGAZE_EXPLORER}/{submitted_tx.tx_hash}"
             )
             if config.sleep_between_txs[1]:
