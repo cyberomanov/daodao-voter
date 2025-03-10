@@ -71,7 +71,7 @@ def process_wallet_vote(
         return
 
     stars_balance = get_balance(client=client, address=str(wallet.address()), denom=STARS_FEE_DENOM)
-    if stars_balance.float <= 1:
+    if stars_balance.float <= 2:
         logger.warning(
             f"#{wallet_index} | {wallet.address()}: balance {stars_balance.float} {STARS_DEFAULT_DENOM} is too low.")
         return
@@ -87,13 +87,14 @@ def process_wallet_vote(
         vote=random_vote
     )
     if vote_tx.estimated_gas and vote_tx.generated_tx:
-        submitted_tx = submit_tx(
-            client=client,
-            wallet=wallet,
-            tx=vote_tx.generated_tx,
-            gas_limit=int(vote_tx.estimated_gas * config.gas_multiplier)
-        )
         try:
+            submitted_tx = submit_tx(
+                client=client,
+                wallet=wallet,
+                tx=vote_tx.generated_tx,
+                gas_limit=int(vote_tx.estimated_gas * config.gas_multiplier)
+            )
+
             submitted_tx.wait_to_complete(timeout=30)
             logger.success(
                 f"#{wallet_index} | {wallet.address()} | "
@@ -105,7 +106,10 @@ def process_wallet_vote(
         except QueryTimeoutError:
             logger.error(f"#{wallet_index} | {wallet.address()} | timeout error.")
         except Exception as e:
-            logger.exception(f"#{wallet_index} | {wallet.address()} | {e.args}.")
+            if "insufficient funds" in str(e):
+                logger.warning(f"#{wallet_index} | {wallet.address()} | {stars_balance.float} is too low for voting.")
+            else:
+                logger.exception(f"#{wallet_index} | {wallet.address()} | {e.args}.")
     else:
         logger.error(f"#{wallet_index} | {wallet.address()}: invalid transaction simulation: {vote_tx.exception}.")
 
