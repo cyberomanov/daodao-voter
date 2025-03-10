@@ -6,7 +6,6 @@ from loguru import logger
 from data.constants import (
     STARS_CHAIN_ID,
     STARS_FEE_DENOM,
-    STARS_GRPC,
     STARS_STAKING_DENOM,
     STARS_PREFIX,
     STARS_DEFAULT_DENOM,
@@ -165,7 +164,7 @@ def main_executor():
     mnemonics = read_file('user_data/mnemonic.txt')
     client = get_client(
         chain_id=STARS_CHAIN_ID,
-        grpc=STARS_GRPC,
+        grpc=config.stargaze_grpc,
         fee_denom=STARS_FEE_DENOM,
         staking_denom=STARS_STAKING_DENOM,
         multiplier=config.gas_multiplier,
