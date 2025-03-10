@@ -18,6 +18,7 @@ from sdk.cosmpy.aerial.contract import LedgerContract
 from sdk.cosmpy.aerial.exceptions import QueryTimeoutError
 from sdk.cosmpy.aerial.wallet import LocalWallet
 from tools.daodao.choose_vote import choose_vote
+from tools.daodao.total_votes import get_total_votes
 from tools.other.read_file import read_file
 from tools.other.sleep import sleep_in_range
 from tools.requests.daodao import (
@@ -75,7 +76,7 @@ def process_wallet_vote(
             f"#{wallet_index} | {wallet.address()}: balance {stars_balance.float} {STARS_DEFAULT_DENOM} is too low.")
         return
 
-    logger.info(f"#{wallet_index} | {wallet.address()}: balance {stars_balance.float} {STARS_DEFAULT_DENOM}.")
+    # logger.info(f"#{wallet_index} | {wallet.address()}: balance {stars_balance.float} {STARS_DEFAULT_DENOM}.")
 
     random_vote = choose_vote(votes=proposal_votes, choices=proposal_choices)
     vote_tx = simulate_vote_tx(
@@ -116,7 +117,8 @@ def process_proposal(
         proposal_prefix: str,
         session: requests.Session,
         client: LedgerClient,
-        mnemonics: list):
+        mnemonics: list
+):
     proposal = get_proposal_info(
         session=session,
         dao_contract=proposal_contract,
@@ -124,22 +126,34 @@ def process_proposal(
         proposal_type=proposal_type
     )
     proposal_contract = get_contract_by_address(address=proposal_contract, client=client)
-    logger.info(f"{proposal_prefix}/{proposal_id}: {proposal.proposal.votes}.")
-
-    random.shuffle(mnemonics)
-    for index, mnemonic in enumerate(mnemonics, start=1):
-        process_wallet_vote(
-            proposal_contract=proposal_contract,
-            proposal_id=proposal_id,
-            proposal_prefix=proposal_prefix,
-            wallet=get_wallet_from_mnemonic(mnemonic=mnemonic, prefix=STARS_PREFIX),
-            session=session,
-            client=client,
-            proposal_votes=proposal.proposal.votes,
-            proposal_choices=proposal.proposal.choices,
-            wallet_index=index,
-            proposal_type=proposal_type
+    try:
+        quorum_value = int(float(proposal.proposal.threshold['threshold_quorum']['quorum']['percent']) * 100)
+    except:
+        quorum_value = int(float(proposal.proposal.voting_strategy['single_choice']['quorum']['percent']) * 100)
+    total_votes = get_total_votes(votes=proposal.proposal.votes, choices=proposal.proposal.choices)
+    total_power = int(proposal.proposal.total_power)
+    turnout = round(100 / total_power * total_votes, 2)
+    if turnout < config.min_required_turnout_threshold:
+        logger.warning(
+            f'{proposal_prefix}/{proposal_id}: {proposal.proposal.votes} - '
+            f'{turnout}/{quorum_value}% turnout, waiting for more votes.'
         )
+    else:
+        logger.info(f"{proposal_prefix}/{proposal_id}: {proposal.proposal.votes} - {turnout}/{quorum_value}% turnout.")
+        random.shuffle(mnemonics)
+        for index, mnemonic in enumerate(mnemonics, start=1):
+            process_wallet_vote(
+                proposal_contract=proposal_contract,
+                proposal_id=proposal_id,
+                proposal_prefix=proposal_prefix,
+                wallet=get_wallet_from_mnemonic(mnemonic=mnemonic, prefix=STARS_PREFIX),
+                session=session,
+                client=client,
+                proposal_votes=proposal.proposal.votes,
+                proposal_choices=proposal.proposal.choices,
+                wallet_index=index,
+                proposal_type=proposal_type
+            )
 
 
 def main_executor():
@@ -190,6 +204,7 @@ def main_executor():
                 proposal_contract=module.contract,
                 proposal_type=module.type
             )
+
             open_proposals = [proposal for proposal in total_proposals if proposal.proposal.status == "open"]
             random.shuffle(open_proposals)
             for proposal in open_proposals:
