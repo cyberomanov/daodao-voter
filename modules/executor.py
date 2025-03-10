@@ -35,6 +35,7 @@ from tools.web3.contract import get_contract_by_address
 from tools.web3.transaction import simulate_vote_tx, submit_tx
 from tools.web3.wallet import get_wallet_from_mnemonic
 from user_data import config
+from user_data.config import sleep_between_loops
 
 
 def process_wallet_vote(
@@ -173,6 +174,7 @@ def main_executor():
 
     with get_proxied_session(proxy=config.proxy) as session:
         voter_mnemonics = []
+        random.shuffle(mnemonics)
         for wallet_index, mnemonic in enumerate(mnemonics, start=1):
             wallet = get_wallet_from_mnemonic(mnemonic=mnemonic, prefix=STARS_PREFIX)
             voting_power = get_voting_power(
@@ -221,3 +223,9 @@ def main_executor():
                     client=client,
                     mnemonics=voter_mnemonics
                 )
+
+    sleep_in_range(
+        sec_from=sleep_between_loops[0],
+        sec_to=sleep_between_loops[1],
+        log="sleep between loops"
+    )
